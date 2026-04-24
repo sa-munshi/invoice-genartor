@@ -95,60 +95,102 @@ def sgst(update, context):
 
     file_name = f"invoice_{invoice_no}.pdf"
 
-    c = canvas.Canvas(file_name, pagesize=A4)
+from reportlab.lib import colors
 
-    # HEADER
-    c.setFont("Helvetica-Bold", 14)
-    c.drawString(50, 800, "STAR COOLING")
+c = canvas.Canvas(file_name, pagesize=A4)
 
-    c.setFont("Helvetica", 10)
-    c.drawString(50, 785, "AC Repair & AMC Services")
-    c.drawString(50, 770, "Kolkata - 700033")
-    c.drawString(50, 755, "Mobile: 9775500217")
-    c.drawString(50, 740, "GSTIN: XXXXX")
+# ================= HEADER =================
+c.setFont("Helvetica-Bold", 14)
+c.drawString(50, 800, "STAR COOLING")
 
-    # INVOICE
-    c.drawString(400, 800, f"Invoice No: {invoice_no}")
-    c.drawString(400, 785, f"Date: {datetime.now().strftime('%d-%m-%Y')}")
+c.setFont("Helvetica", 10)
+c.drawString(50, 785, "AC Repair & AMC Services")
+c.drawString(50, 770, "Kolkata - 700033")
+c.drawString(50, 755, "Mobile: +919007107975")
+c.drawString(50, 740, "GSTIN: 19AAACS2838Z6")
 
-    # CUSTOMER
-    c.drawString(50, 710, "Bill To:")
-    c.drawString(50, 695, user_data_store["name"])
-    c.drawString(50, 680, user_data_store["address"])
+# Right side info
+c.drawString(400, 800, f"Invoice No: {invoice_no}")
+c.drawString(400, 785, f"Date: {datetime.now().strftime('%d-%m-%Y')}")
 
-    # TABLE
-    y = 640
-    c.drawString(50, y, "Description")
-    c.drawString(300, y, "Qty")
-    c.drawString(350, y, "Rate")
-    c.drawString(420, y, "Amount")
+# ================= BILL TO BOX =================
+c.rect(50, 690, 500, 50)
 
-    y -= 20
-    c.drawString(50, y, user_data_store["item"])
-    c.drawString(300, y, str(qty))
-    c.drawString(350, y, str(rate))
-    c.drawString(420, y, f"{subtotal:.2f}")
+c.setFont("Helvetica-Bold", 10)
+c.drawString(55, 725, "Bill To:")
 
-    # TOTALS
-    y -= 40
-    c.drawString(350, y, f"Subtotal: {subtotal:.2f}")
-    y -= 15
-    c.drawString(350, y, f"CGST ({user_data_store['cgst']}%): {cgst_amt:.2f}")
-    y -= 15
-    c.drawString(350, y, f"SGST ({user_data_store['sgst']}%): {sgst_amt:.2f}")
-    y -= 15
-    c.drawString(350, y, f"Total: {total:.2f}")
+c.setFont("Helvetica", 10)
+c.drawString(55, 710, user_data_store["name"])
+c.drawString(55, 695, user_data_store["address"])
 
-    # SIGNATURE
-    if os.path.exists("signature.png"):
-        c.drawImage("signature.png", 400, 500, width=120, height=50)
+# ================= TABLE =================
 
-    c.drawString(400, 490, "Authorized Signatory")
+# Column positions
+x_desc = 55
+x_qty = 300
+x_rate = 360
+x_amt = 440
 
-    c.save()
+y = 650
 
-    update.message.reply_document(open(file_name, "rb"))
+# Header row box
+c.rect(50, y, 500, 25)
 
+c.setFont("Helvetica-Bold", 10)
+c.drawString(x_desc, y+8, "Description")
+c.drawString(x_qty, y+8, "Qty")
+c.drawString(x_rate, y+8, "Rate")
+c.drawString(x_amt, y+8, "Amount")
+
+# Item row
+y -= 25
+c.rect(50, y, 500, 25)
+
+c.setFont("Helvetica", 10)
+c.drawString(x_desc, y+8, user_data_store["item"])
+c.drawString(x_qty, y+8, str(qty))
+c.drawString(x_rate, y+8, f"{rate:.2f}")
+c.drawString(x_amt, y+8, f"{subtotal:.2f}")
+
+# ================= TOTALS =================
+
+y -= 60
+
+c.setFont("Helvetica", 10)
+c.drawString(350, y, f"Subtotal: {subtotal:.2f}")
+y -= 15
+c.drawString(350, y, f"CGST ({user_data_store['cgst']}%): {cgst_amt:.2f}")
+y -= 15
+c.drawString(350, y, f"SGST ({user_data_store['sgst']}%): {sgst_amt:.2f}")
+
+y -= 20
+c.setFont("Helvetica-Bold", 11)
+c.drawString(350, y, f"TOTAL: {total:.2f}")
+
+# ================= SIGNATURE =================
+
+signature_path = "signature.png"
+
+if os.path.exists(signature_path):
+    c.drawImage(
+        signature_path,
+        400, 500,
+        width=120,
+        height=60,
+        preserveAspectRatio=True,
+        mask='auto'
+    )
+else:
+    c.drawString(400, 520, "No Signature Found")
+
+c.setFont("Helvetica", 9)
+c.drawString(400, 490, "Authorized Signatory")
+
+# ================= FOOTER =================
+c.setFont("Helvetica", 8)
+c.drawString(50, 50, "This is a computer-generated invoice.")
+
+c.save()
     return ConversationHandler.END
 
 
