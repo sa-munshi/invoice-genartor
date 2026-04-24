@@ -1,24 +1,27 @@
 import os
-import logging
-from datetime import datetime
-
-from telegram import Update
-from telegram.ext import (
-    Updater, CommandHandler, MessageHandler,
-    Filters, ConversationHandler, CallbackContext
-)
-
-from reportlab.lib.pagesizes import A4
+from flask import Flask, request
+from telegram import Bot, Update
+from telegram.ext import Dispatcher, CommandHandler, MessageHandler, Filters, ConversationHandler
 from reportlab.pdfgen import canvas
+from reportlab.lib.pagesizes import A4
+from datetime import datetime
 
 # STATES
 (NAME, ADDRESS, ITEM, QTY, RATE, CGST, SGST) = range(7)
 
 user_data_store = {}
 
-# ---------------- START ----------------
+TOKEN = os.getenv("BOT_TOKEN")
+bot = Bot(token=TOKEN)
 
-def start(update: Update, context: CallbackContext):
+app = Flask(__name__)
+
+dispatcher = Dispatcher(bot, None, use_context=True)
+
+
+# -------- HANDLERS --------
+
+def start(update, context):
     update.message.reply_text("Customer Name:")
     return NAME
 
@@ -71,16 +74,15 @@ def sgst(update, context):
         update.message.reply_text("Enter valid number:")
         return SGST
 
-    # CALCULATION
     qty = user_data_store["qty"]
     rate = user_data_store["rate"]
-    subtotal = qty * rate
 
+    subtotal = qty * rate
     cgst_amt = subtotal * user_data_store["cgst"] / 100
     sgst_amt = subtotal * user_data_store["sgst"] / 100
     total = subtotal + cgst_amt + sgst_amt
 
-    # INVOICE COUNTER (SAFE)
+    # COUNTER
     if not os.path.exists("invoice_counter.txt"):
         with open("invoice_counter.txt", "w") as f:
             f.write("0")
@@ -93,7 +95,6 @@ def sgst(update, context):
 
     file_name = f"invoice_{invoice_no}.pdf"
 
-    # PDF
     c = canvas.Canvas(file_name, pagesize=A4)
 
     # HEADER
@@ -106,7 +107,7 @@ def sgst(update, context):
     c.drawString(50, 755, "Mobile: 9775500217")
     c.drawString(50, 740, "GSTIN: XXXXX")
 
-    # INVOICE INFO
+    # INVOICE
     c.drawString(400, 800, f"Invoice No: {invoice_no}")
     c.drawString(400, 785, f"Date: {datetime.now().strftime('%d-%m-%Y')}")
 
@@ -115,14 +116,13 @@ def sgst(update, context):
     c.drawString(50, 695, user_data_store["name"])
     c.drawString(50, 680, user_data_store["address"])
 
-    # TABLE HEADER
+    # TABLE
     y = 640
     c.drawString(50, y, "Description")
     c.drawString(300, y, "Qty")
     c.drawString(350, y, "Rate")
     c.drawString(420, y, "Amount")
 
-    # ITEM
     y -= 20
     c.drawString(50, y, user_data_store["item"])
     c.drawString(300, y, str(qty))
@@ -157,31 +157,38 @@ def cancel(update, context):
     return ConversationHandler.END
 
 
-def main():
-    TOKEN = os.getenv("BOT_TOKEN")
+conv = ConversationHandler(
+    entry_points=[CommandHandler("newinvoice", start)],
+    states={
+        NAME: [MessageHandler(Filters.text, name)],
+        ADDRESS: [MessageHandler(Filters.text, address)],
+        ITEM: [MessageHandler(Filters.text, item)],
+        QTY: [MessageHandler(Filters.text, qty)],
+        RATE: [MessageHandler(Filters.text, rate)],
+        CGST: [MessageHandler(Filters.text, cgst)],
+        SGST: [MessageHandler(Filters.text, sgst)],
+    },
+    fallbacks=[CommandHandler("cancel", cancel)],
+)
 
-    updater = Updater(TOKEN, use_context=True)
-    dp = updater.dispatcher
+dispatcher.add_handler(conv)
 
-    conv = ConversationHandler(
-        entry_points=[CommandHandler("newinvoice", start)],
-        states={
-            NAME: [MessageHandler(Filters.text, name)],
-            ADDRESS: [MessageHandler(Filters.text, address)],
-            ITEM: [MessageHandler(Filters.text, item)],
-            QTY: [MessageHandler(Filters.text, qty)],
-            RATE: [MessageHandler(Filters.text, rate)],
-            CGST: [MessageHandler(Filters.text, cgst)],
-            SGST: [MessageHandler(Filters.text, sgst)],
-        },
-        fallbacks=[CommandHandler("cancel", cancel)],
-    )
 
-    dp.add_handler(conv)
+# -------- WEBHOOK --------
 
-    updater.start_polling()
-    updater.idle()
+@app.route(f"/{TOKEN}", methods=["POST"])
+def webhook():
+    update = Update.de_json(request.get_json(force=True), bot)
+    dispatcher.process_update(update)
+    return "ok"
 
+
+@app.route("/")
+def home():
+    return "Bot is running!"
+
+
+# -------- MAIN --------
 
 if __name__ == "__main__":
-    main()
+    app.run(host="0.0.0.0", port=int(os.environ.get("PORT", 10000)))
