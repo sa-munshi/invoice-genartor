@@ -191,6 +191,9 @@ c.setFont("Helvetica", 8)
 c.drawString(50, 50, "This is a computer-generated invoice.")
 
 c.save()
+
+    update.message.reply_document(open(file_name, "rb"))
+
     return ConversationHandler.END
 
 
