@@ -220,6 +220,9 @@ def generate_pdf(data, file_name):
 
     # ── AUTHORISED SIGNATURE — bottom right ──
     sig_y = 20*mm
+    sig_img = os.path.join(os.path.dirname(os.path.abspath(__file__)), "signature.png")
+    if os.path.exists(sig_img):
+        c.drawImage(sig_img, width - 72*mm, sig_y + 1*mm, width=55*mm, height=18*mm, mask='auto')
     c.setStrokeColor(black)
     c.setLineWidth(0.8)
     c.line(width - 72*mm, sig_y, width - 13*mm, sig_y)
